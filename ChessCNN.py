@@ -53,7 +53,7 @@ board_positions = {
 # Function to convert square to index
 def square_to_index(square):
     letter = chess.square_name(square)  # Get algebraic notation of the square
-    row = 8- int(letter[1]) # Convert rank to row index
+    row = 8 - int(letter[1]) # Convert rank to row index
     column = board_positions[letter[0]]  # Map file to column index using board_positions dictionary
     return row, column  # Return row and column indices
 
@@ -61,20 +61,28 @@ def square_to_index(square):
 # Function to convert board to matrix representation
 def board_to_matrix(board):
     # Initialize a 3D numpy array to represent the board
+    # 12 dimensions -> different chess piece types (Pawn, Knight, Bishop, Rook, Queen, King) for white and black
+    # +2 dimensions -> legal moves for current player and opponent
     board_3d = np.zeros((14, 8, 8), dtype=np.int8)
 
     # Iterate over each piece type
     for piece in chess.PIECE_TYPES:
         # Iterate over each white piece on the board
         for square in board.pieces(piece, chess.WHITE):
-            # Convert square index to row and column indices, and mark the corresponding position in the matrix
+            # Convert square index to row and column indices and mark the corresponding position in the matrix with 1
             index = np.unravel_index(square, (8, 8))
+            # piece - 1 -> layer of 3D array corresponding to piece type (0-5)
+            # 7 - index[0] -> row index (row numbering in chess module is reversed)
+            # index[1] -> column index
             board_3d[piece - 1][7 - index[0]][index[1]] = 1
 
         # Iterate over each black piece on the board
         for square in board.pieces(piece, chess.BLACK):
-            # Convert square index to row and column indices, and mark the corresponding position in the matrix
+            # Convert square index to row and column indices, and mark the corresponding position in the matrix with 1
             index = np.unravel_index(square, (8, 8))
+            # piece + 5 -> layer of 3D array corresponding to black piece type (6-11)
+            # 7 - index[0] -> row index (row numbering in chess module is reversed)
+            # index[1] -> column index
             board_3d[piece + 5][7 - index[0]][index[1]] = 1
 
     # Store legal moves for the current player
@@ -82,13 +90,13 @@ def board_to_matrix(board):
     board.turn = chess.WHITE
     for move in board.legal_moves:
         i, j = square_to_index(move.to_square)
-        board_3d[12][i][j] = 1
+        board_3d[12][i][j] = 1  # Layer 12
 
     # Store legal moves for the opponent player
     board.turn = chess.BLACK
     for move in board.legal_moves:
         i, j = square_to_index(move.to_square)
-        board_3d[13][i][j] = 1
+        board_3d[13][i][j] = 1  # Layer 13
 
     # Restore the original player turn
     board.turn = aux
@@ -132,20 +140,24 @@ def populate_dataset(size):
 # Function to build convolutional neural network model
 def build_conv_model(conv_size, conv_depth):
     # Define the input layer for the 3D matrix representation of the chess board
+    # 12 dimensions -> different chess piece types (Pawn, Knight, Bishop, Rook, Queen, King) for white and black
+    # +2 dimensions -> legal moves for current player and opponent
     board_3d = layers.Input(shape=(14, 8, 8))
 
     #  Set the input as the initial value of x
     x = board_3d
 
-    # Add convolutional layers to the model
+    # Add convolutional layers to the model based on the conv_depth, more -> deeper
     for i in range(conv_depth):
         x = layers.Conv2D(filters=conv_size, kernel_size=3, padding='same', activation='relu')(x)
 
-    # Flatten the output of the convolutional layers
+    # Flatten the output of the convolutional layers to prepare processing dense layers
     x = layers.Flatten()(x)
 
     # Add dense layers to the model for further processing
+    # Connect everything together using 64 neurons
     x = layers.Dense(64, 'relu')(x)
+    # 1 neuron for 0-1 range output
     x = layers.Dense(1, 'sigmoid')(x)
 
     # Define the model with input and output layers
@@ -168,7 +180,7 @@ def get_dataset():
 
 # Function to train the neural network model
 def train_model(model, x_train, y_train):
-    # Compile the model with Adam optimizer and mean squared error loss
+    # Compile the model with Adam optimizer and mean squared error loss -> regression
     model.compile(optimizer=optimizers.Adam(5e-4), loss='mean_squared_error')
 
     # Print a summary of the model architecture
@@ -176,14 +188,14 @@ def train_model(model, x_train, y_train):
 
     # Train the model with the specified training data
     model.fit(
-        x_train, y_train,
-        batch_size=2048,
-        epochs=2,
-        verbose=1,
-        validation_split=0.1,
+        x_train, y_train,  # Training data
+        batch_size=2048,  # Samples before weights updated
+        epochs=2,  # Train over dataset twice
+        verbose=1,  # Print progress
+        validation_split=0.1,  # 10% for data validation
         callbacks=[
-            callbacks.ReduceLROnPlateau(monitor='loss', patience=10),
-            callbacks.EarlyStopping(monitor='loss', patience=15, min_delta=1e-4)
+            callbacks.ReduceLROnPlateau(monitor='loss', patience=10),  # Reduce learning when loss stops improving in 10 epochs
+            callbacks.EarlyStopping(monitor='loss', patience=15, min_delta=1e-4)  # Stop training when loss doesn't decrease by at least 0.0001
         ]
     )
 
@@ -193,7 +205,7 @@ def train_model(model, x_train, y_train):
 
 # Function to evaluate a board position using minimax algorithm
 def minimax_eval(board, model):
-    # Convert the board to its 3D matrix representation and add a batch dimension
+    # Convert the board to its 3D matrix representation and add a batch dimension for format
     board3d = board_to_matrix(board)
     board3d = np.expand_dims(board3d, 0)
 
