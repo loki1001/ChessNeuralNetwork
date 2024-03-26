@@ -12,6 +12,6 @@ To run the chess game, execute the ChessCNN.py file. The GUI window will open, a
 
 ## Video Demonstration
 
-[![Video Thumbnail](ChessNeuralNetwork.png)]([youtube.com](https://youtu.be/_VZEpQ28PcA))
+[![Video Thumbnail](ChessNeuralNetwork.png)](https://youtu.be/_VZEpQ28PcA)
 
 Click on the thumbnail above to watch the video demonstration of using this program. 
