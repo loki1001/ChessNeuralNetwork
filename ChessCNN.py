@@ -16,8 +16,12 @@ from keras.models import load_model
 # Constants
 BOARD_SIZE = 8
 SQUARE_SIZE = 60
-COLOR_LIGHT_SQUARE = "#FFCE9E"
-COLOR_DARK_SQUARE = "#D18B47"
+COLOR_LIGHT_SQUARE = '#FFCE9E'
+COLOR_DARK_SQUARE = '#D18B47'
+
+STOCKFISHENGINE = '/usr/local/Cellar/stockfish/16.1/bin/stockfish'
+DATASET = 'dataset'
+MODEL = 'chess_model_update.h5'
 
 
 # Function to generate a random board
@@ -36,11 +40,11 @@ def random_board_generator(max_depth):
 # Function to evaluate a board position using Stockfish
 def stockfish_evaluation(board, depth):
     # Open connection to Stockfish
-    with chess.engine.SimpleEngine.popen_uci('/usr/local/Cellar/stockfish/16.1/bin/stockfish') as stockfish:
+    with chess.engine.SimpleEngine.popen_uci(STOCKFISHENGINE) as stockfish:
         # Analyze the board position with the specified depth limit
         result = stockfish.analyse(board, chess.engine.Limit(depth=depth))
         # Extract the evaluation score from the analysis
-        score = result['score'].black().score()
+        score = result["score"].black().score()
     return score  # Return the evaluation score
 
 
@@ -134,7 +138,7 @@ def populate_dataset(size):
     v = np.array(v)
 
     # Save the dataset as a compressed .npz file
-    np.savez('dataset', b=b, v=v)
+    np.savez(DATASET, b=b, v=v)
 
 
 # Function to build convolutional neural network model
@@ -149,16 +153,16 @@ def build_conv_model(conv_size, conv_depth):
 
     # Add convolutional layers to the model based on the conv_depth, more -> deeper
     for i in range(conv_depth):
-        x = layers.Conv2D(filters=conv_size, kernel_size=3, padding='same', activation='relu')(x)
+        x = layers.Conv2D(filters=conv_size, kernel_size=3, padding="same", activation="relu")(x)
 
     # Flatten the output of the convolutional layers to prepare processing dense layers
     x = layers.Flatten()(x)
 
     # Add dense layers to the model for further processing
     # Connect everything together using 64 neurons
-    x = layers.Dense(64, 'relu')(x)
+    x = layers.Dense(64, "relu")(x)
     # 1 neuron for 0-1 range output
-    x = layers.Dense(1, 'sigmoid')(x)
+    x = layers.Dense(1, "sigmoid")(x)
 
     # Define the model with input and output layers
     return models.Model(inputs=board_3d, outputs=x)
@@ -167,7 +171,7 @@ def build_conv_model(conv_size, conv_depth):
 # Function to get dataset from saved file
 def get_dataset():
     # Load the dataset from the saved .npz file
-    container = np.load('dataset.npz')
+    container = np.load(DATASET + ".npz")
 
     # Extract board positions (b) and evaluations (v) from the loaded container
     b, v = container['b'], container['v']
@@ -181,7 +185,7 @@ def get_dataset():
 # Function to train the neural network model
 def train_model(model, x_train, y_train):
     # Compile the model with Adam optimizer and mean squared error loss -> regression
-    model.compile(optimizer=optimizers.Adam(5e-4), loss='mean_squared_error')
+    model.compile(optimizer=optimizers.Adam(5e-4), loss="mean_squared_error")
 
     # Print a summary of the model architecture
     model.summary()
@@ -194,13 +198,13 @@ def train_model(model, x_train, y_train):
         verbose=1,  # Print progress
         validation_split=0.1,  # 10% for data validation
         callbacks=[
-            callbacks.ReduceLROnPlateau(monitor='loss', patience=10),  # Reduce learning when loss stops improving in 10 epochs
-            callbacks.EarlyStopping(monitor='loss', patience=15, min_delta=1e-4)  # Stop training when loss doesn't decrease by at least 0.0001
+            callbacks.ReduceLROnPlateau(monitor="loss", patience=10),  # Reduce learning when loss stops improving in 10 epochs
+            callbacks.EarlyStopping(monitor="loss", patience=15, min_delta=1e-4)  # Stop training when loss doesn't decrease by at least 0.0001
         ]
     )
 
     # Save the trained model
-    model.save('chess_model.h5')
+    model.save(MODEL)
 
 
 # Function to evaluate a board position using minimax algorithm
@@ -426,7 +430,7 @@ def create_chessboard(board):
 if __name__ == "__main__":
     # Check if a pre-trained model exists
     try:
-        model = load_model('chess_model.h5')
+        model = load_model(MODEL)
         print("Using existing model for game.")
     # If no pre-trained model found, train a new one
     except FileNotFoundError:
